@@ -58,11 +58,13 @@ jobs:
 
       - name: Descargar pdfium
         shell: bash
+        # Rutas relativas: el tar de Windows confunde "D:\..." con un servidor remoto.
         run: |
-          curl -fsSL "https://github.com/bblanchon/pdfium-binaries/releases/download/${PDFIUM_RELEASE}/${{ matrix.pdfium }}" \
-            | tar xz -C "$RUNNER_TEMP"
-          mkdir -p src-tauri/pdfium
-          cp "$RUNNER_TEMP/${{ matrix.library }}" src-tauri/pdfium/
+          mkdir -p pdfium-download src-tauri/pdfium
+          curl -fsSL -o pdfium-download/pdfium.tgz \
+            "https://github.com/bblanchon/pdfium-binaries/releases/download/${PDFIUM_RELEASE}/${{ matrix.pdfium }}"
+          tar xzf pdfium-download/pdfium.tgz -C pdfium-download
+          cp "pdfium-download/${{ matrix.library }}" src-tauri/pdfium/
 
       - run: pnpm install --frozen-lockfile
 
