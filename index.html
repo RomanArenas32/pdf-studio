@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="stylesheet" href="/src/styles.css" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PDF Studio</title>
+    <script type="module" src="/src/main.ts" defer></script>
+  </head>
+
+  <body>
+    <header class="toolbar">
+      <div class="row">
+        <div class="group">
+          <button id="btn-open" title="Abrir (⌘O)">Abrir</button>
+          <button id="btn-save" title="Guardar (⌘S)" disabled>Guardar</button>
+          <button id="btn-save-as" title="Guardar como (⇧⌘S)" disabled>Guardar como…</button>
+          <button id="btn-batch" title="Generar muchas copias cambiando textos con los datos de un Excel o CSV" disabled>Generar en serie…</button>
+        </div>
+        <div class="group">
+          <button id="btn-undo" class="icon" title="Deshacer (⌘Z)" disabled>↶</button>
+          <button id="btn-redo" class="icon" title="Rehacer (⇧⌘Z)" disabled>↷</button>
+        </div>
+        <div class="group">
+          <button id="btn-prev" class="icon" title="Página anterior (←)" disabled>‹</button>
+          <span id="page-indicator" class="indicator">–</span>
+          <button id="btn-next" class="icon" title="Página siguiente (→)" disabled>›</button>
+        </div>
+        <div class="group">
+          <button id="btn-zoom-out" class="icon" title="Alejar (⌘−)" disabled>−</button>
+          <span id="zoom-indicator" class="indicator">100%</span>
+          <button id="btn-zoom-in" class="icon" title="Acercar (⌘+)" disabled>+</button>
+        </div>
+        <span id="file-name" class="file-name"></span>
+      </div>
+
+      <div class="row">
+        <div class="group segmented" id="tools" role="toolbar" aria-label="Herramientas">
+          <button data-tool="select" title="Seleccionar: clic para elegir, arrastrar para mover, doble clic para editar, Supr para borrar. Funciona con tu texto y con el texto original del PDF (V)" aria-pressed="true" disabled>Seleccionar</button>
+          <button data-tool="text" title="Agregar o editar texto propio (T)" disabled>Texto</button>
+          <button data-tool="edit-text" title="Texto original del PDF (experimental): clic para editar, arrastrar para mover (X)" disabled>Editar texto del PDF</button>
+          <button data-tool="highlight" title="Resaltar (H)" disabled>Resaltar</button>
+          <button data-tool="rect" title="Rectángulo (R)" disabled>Rectángulo</button>
+          <button data-tool="pen" title="Lápiz (P)" disabled>Lápiz</button>
+          <button data-tool="eraser" title="Borrar anotación (E)" disabled>Borrador</button>
+        </div>
+        <div class="group" id="tool-options" hidden>
+          <label class="option" title="Color">
+            <input id="opt-color" type="color" value="#000000" />
+          </label>
+          <label class="option" id="opt-size-wrap">
+            Tamaño
+            <select id="opt-size">
+              <option>8</option>
+              <option>10</option>
+              <option>12</option>
+              <option selected>14</option>
+              <option>18</option>
+              <option>24</option>
+              <option>36</option>
+              <option>48</option>
+              <option>72</option>
+            </select>
+          </label>
+          <label class="option" id="opt-width-wrap">
+            Grosor
+            <input id="opt-width" type="range" min="0.5" max="12" step="0.5" value="2" />
+          </label>
+        </div>
+        <div class="group pages-group">
+          <button id="btn-rotate-left" class="icon" title="Girar a la izquierda" disabled>⟲</button>
+          <button id="btn-rotate-right" class="icon" title="Girar a la derecha" disabled>⟳</button>
+          <button id="btn-blank" title="Insertar página en blanco después de la actual" disabled>Página en blanco</button>
+          <button id="btn-insert" title="Insertar otro PDF después de la página actual" disabled>Insertar PDF…</button>
+          <button id="btn-delete" class="danger" title="Eliminar página" disabled>Eliminar página</button>
+        </div>
+      </div>
+    </header>
+
+    <div class="workspace">
+      <aside id="thumbnails" class="thumbnails" aria-label="Páginas"></aside>
+      <main id="viewer" class="viewer">
+        <div id="empty" class="empty">
+          <p>Abre un PDF o arrástralo aquí</p>
+          <button id="btn-open-empty">Abrir PDF…</button>
+        </div>
+        <div id="page-wrap" class="page-wrap" data-tool="select" hidden>
+          <img id="page" class="page" alt="" draggable="false" />
+          <svg id="overlay" class="overlay"></svg>
+        </div>
+      </main>
+
+      <aside id="batch-panel" class="batch-panel" aria-label="Generar en serie" hidden>
+        <header>
+          <h2>Generar en serie</h2>
+          <button id="batch-close" class="icon" title="Cerrar (Esc)">×</button>
+        </header>
+
+        <section>
+          <h3>1. Campos</h3>
+          <p class="hint">Haz clic en el texto que cambia en cada copia, por ejemplo el nombre. Vuelve a hacer clic para quitarlo.</p>
+          <ol id="batch-fields" class="batch-fields"></ol>
+        </section>
+
+        <section>
+          <h3>2. Datos</h3>
+          <button id="batch-load">Cargar Excel o CSV…</button>
+          <p id="batch-table-info" class="hint">La primera fila debe tener los nombres de las columnas.</p>
+          <div id="batch-preview-nav" class="preview-nav" hidden>
+            <button id="batch-prev" class="icon" title="Fila anterior">‹</button>
+            <span id="batch-row-label"></span>
+            <button id="batch-next" class="icon" title="Fila siguiente">›</button>
+          </div>
+        </section>
+
+        <section>
+          <h3>3. Salida</h3>
+          <label class="radio"><input type="radio" name="batch-mode" value="files" checked /> Un PDF por fila</label>
+          <label class="pattern">
+            Nombre de cada archivo
+            <input id="batch-pattern" type="text" spellcheck="false" placeholder="{Nombre}" />
+          </label>
+          <label class="radio"><input type="radio" name="batch-mode" value="single" /> Un solo PDF con todas las páginas</label>
+          <button id="batch-run" class="primary" disabled>Generar</button>
+          <div id="batch-progress" class="progress" hidden>
+            <progress id="batch-progress-bar" value="0" max="1"></progress>
+            <span id="batch-progress-label"></span>
+            <button id="batch-cancel">Cancelar</button>
+          </div>
+          <p id="batch-result" class="hint"></p>
+        </section>
+      </aside>
+    </div>
+
+    <div id="toast" class="toast" hidden></div>
+  </body>
+</html>
