@@ -1,0 +1,81 @@
+# Compila los instaladores de Windows y macOS en servidores de GitHub.
+# Se ejecuta a mano (pestaña Actions → "Compilar instaladores" → Run workflow)
+# o al subir una etiqueta de versión, por ejemplo: git tag v0.1.0 && git push --tags
+name: Compilar instaladores
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+# Versión de pdfium; debe coincidir con la que espera pdfium-render (feature pdfium_7881).
+env:
+  PDFIUM_RELEASE: chromium%2F7881
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: windows
+            runner: windows-latest
+            pdfium: pdfium-win-x64.tgz
+            library: bin/pdfium.dll
+            args: --bundles nsis,msi
+            installers: |
+              src-tauri/target/release/bundle/nsis/*.exe
+              src-tauri/target/release/bundle/msi/*.msi
+          - name: macos
+            runner: macos-latest
+            # Binario universal: funciona en Apple Silicon e Intel.
+            pdfium: pdfium-mac-univ.tgz
+            library: lib/libpdfium.dylib
+            args: --target universal-apple-darwin --bundles dmg
+            installers: |
+              src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg
+
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.name == 'macos' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Descargar pdfium
+        shell: bash
+        run: |
+          curl -fsSL "https://github.com/bblanchon/pdfium-binaries/releases/download/${PDFIUM_RELEASE}/${{ matrix.pdfium }}" \
+            | tar xz -C "$RUNNER_TEMP"
+          mkdir -p src-tauri/pdfium
+          cp "$RUNNER_TEMP/${{ matrix.library }}" src-tauri/pdfium/
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Tests
+        working-directory: src-tauri
+        run: cargo test
+
+      - name: Compilar
+        run: pnpm tauri build ${{ matrix.args }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pdf-studio-${{ matrix.name }}
+          path: ${{ matrix.installers }}
+          if-no-files-found: error
